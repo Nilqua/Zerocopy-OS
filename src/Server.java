@@ -10,7 +10,7 @@ public class Server {
     public static void main(String[] args) {
 
         int port = 9999;
-        String fileToSend = "file_to_send.txt"; // <-- ไฟล์ที่ท่านเจนายสร้างไว้
+        String fileToSend = "file_to_send.txt";
 
         System.out.println("เซิร์ฟเวอร์: กำลังเปิดบ้านรอที่ Port " + port);
 
