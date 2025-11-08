@@ -10,44 +10,49 @@ public class Server {
     public static void main(String[] args) {
 
         int port = 9999;
-        String fileToSend = "file_to_send.txt";
+        String fileToSend = "..\\TestSite\\From\\TestFileSent";
 
-        System.out.println("เซิร์ฟเวอร์: กำลังเปิดบ้านรอที่ Port " + port);
-
-        try {
-            // 1. เปิดช่องทางรอรับ (เหมือนเปิดประตูบ้าน)
+        while(true){
+            try {
+            // Open the server socket channel
             ServerSocketChannel serverSocket = ServerSocketChannel.open();
             serverSocket.bind(new InetSocketAddress(port));
+            System.out.println("Server : Listening on Address " + serverSocket.getLocalAddress());
 
-            // 2. รอคนมาเคาะประตู (รับ Client)
-            // (แบบง่าย ๆ คือรับแค่คนเดียวแล้วปิดเลย)
+            //wait for a client to connect
             SocketChannel clientSocket = serverSocket.accept();
-            System.out.println("เซิร์ฟเวอร์: มีคนมาเชื่อมต่อแล้ว! จาก: " + clientSocket.getRemoteAddress());
+            System.out.println("Server : Connection accepted from " + clientSocket.getRemoteAddress());
 
-            // 3. เปิดไฟล์ที่จะส่ง (เตรียมหยิบของ)
+            //Prepare the file to send
             FileInputStream fileInputStream = new FileInputStream(fileToSend);
             FileChannel fileChannel = fileInputStream.getChannel();
             
             long fileSize = fileChannel.size();
-            System.out.println("เซิร์ฟเวอร์: กำลังจะส่งไฟล์ " + fileToSend + " ขนาด " + fileSize + " ไบต์");
+            System.out.println("Server : Sending file size of " + fileSize + " bytes");
 
-            // 4. *** ท่าไม้ตาย Zero Copy! ***
-            // สั่ง OS ให้ "โอน" จาก fileChannel (ดิสก์)
-            // ไปยัง clientSocket (เน็ตเวิร์ก) โดยตรง
-            // [อ้างอิงหลักการจากสไลด์ Week10 หน้า 14 และ 19]
-            long bytesTransferred = fileChannel.transferTo(0, fileSize, clientSocket); // [cite: 1362]
+            //Zero Copy file transfer Disk->Network
+            //keep track of bytes transferred
+            long startTime = System.currentTimeMillis();
+            long total = 0;
+            while (total < fileSize){
+                long bytesTransferred = fileChannel.transferTo(total, fileSize-total, clientSocket);
+                total += bytesTransferred;
+                System.out.print("\rServer : File transfer (Sent " + total + "/" + fileSize + " bytes)");
+            }
+            long endTime = System.currentTimeMillis();
+            System.out.println("\nServer : File transfer time: " + (endTime - startTime) + " ms");
 
-            System.out.println("เซิร์ฟเวอร์: ส่งไฟล์เสร็จแล้ว! (ส่งไป " + bytesTransferred + " ไบต์)");
-
-            // 5. ปิดทุกอย่าง
+            //Close everything
             fileChannel.close();
             fileInputStream.close();
             clientSocket.close();
             serverSocket.close();
 
-        } catch (IOException e) {
-            System.out.println("เซิร์ฟเวอร์: โอ๊ย! เกิดปัญหาค่ะ!");
-            e.printStackTrace();
+            } catch (Exception e) {
+                System.out.println();
+                System.out.println("Error : " + e);
+                break;
+            }
         }
     }
 }
