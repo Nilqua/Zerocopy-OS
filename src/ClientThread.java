@@ -1,7 +1,10 @@
 import java.io.FileOutputStream;
+import java.io.FileInputStream;
 import java.net.InetSocketAddress;
 import java.nio.channels.FileChannel;
 import java.nio.channels.SocketChannel;
+import java.nio.channels.ServerSocketChannel;
+import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.RandomAccessFile;
 
@@ -10,74 +13,89 @@ public class ClientThread {
         String serverAddress = "localhost";
         int port = 9999;
         String fileToSave = "..\\TestSite\\To\\TestFileDownloaded";
-        long fileSize = 10L * (1024 * 1024 * 1024);
-        int threadCount = 4;
+        int threadCount = 8;
 
         try {
-            RandomAccessFile randomAccessFile = new RandomAccessFile(fileToSave, "rw");
-            FileChannel fileChannel = randomAccessFile.getChannel();
+            //connect to server
+            SocketChannel serverSocket = SocketChannel.open();
+            serverSocket.connect(new InetSocketAddress(serverAddress, port));
+            System.out.println("Client : Connected to server at " + serverAddress + ":" + port);
+            DataOutputStream out = new DataOutputStream(serverSocket.socket().getOutputStream());
+            out.writeUTF("SIZE");
 
+            //read file size from server
+            DataInputStream in = new DataInputStream(serverSocket.socket().getInputStream());
+            long fileSize = in.readLong();
             long partSize = fileSize / threadCount;
             Thread[] threads = new Thread[threadCount];
+            System.out.println("Client : File size is " + fileSize + " bytes.");
+            System.out.println("Client : Starting " + threadCount + " threads");
 
-            long totalStartTime = System.currentTimeMillis();
-            for (int i=0; i<threadCount; i++){
+            //start threads to download
+            long startTime = System.currentTimeMillis();
+            for (int i=0; i<threadCount; i++) {
                 long start = i * partSize;
-                long end;
-                if (i+1 == threadCount){
-                    end = fileSize - 1;
-                } else {
-                    end = (i+1) * partSize - 1;
-                }
+                long end = partSize + start - 1;
 
-                threads[i] = new Thread(new fileReceiver(start, end, serverAddress, port, fileChannel));
+                FileReceiver receiver = new FileReceiver(serverAddress, port, fileToSave, start, end);
+                threads[i] = new Thread(receiver);
                 threads[i].start();
-                System.out.println("Client Thread : Started thread " + (i+1) + " for range " + start + " to " + end);
-
+                System.out.println("Client : Started thread for bytes " + start + " to " + end);
             }
 
-            for (Thread t : threads) {
-                t.join();
+            for (Thread thread : threads) {
+                thread.join();
             }
-            long totalEndTime = System.currentTimeMillis();
-            System.out.println("Client Thread : Total download time: " + (totalEndTime - totalStartTime) + " ms");
+            long endTime = System.currentTimeMillis();
+            System.out.println("Client : File download completed in " + (endTime - startTime) + " ms.");
         } catch (Exception e) {
-            System.out.println("Error : " + e);
+            e.printStackTrace();
         }
-
-
     }
 
-    public static class fileReceiver implements Runnable {
-        private long start, end;
+    public static class FileReceiver implements Runnable {
         private String serverAddress;
         private int port;
-        private FileChannel fileChannel;
+        private String fileToSave;
+        private long start;
+        private long end;
 
-        public fileReceiver(long start, long end,String serverAddress, int port, FileChannel fileChannel) {
-            this.start = start;
-            this.end = end;
+        public FileReceiver(String serverAddress, int port, String fileToSave, long start, long end) {
             this.serverAddress = serverAddress;
             this.port = port;
-            this.fileChannel = fileChannel;
+            this.fileToSave = fileToSave;
+            this.start = start;
+            this.end = end;
         }
 
         @Override
         public void run() {
             try {
                 //connect to server
-                SocketChannel serverSocket = SocketChannel.open(new InetSocketAddress(serverAddress, port));
+                SocketChannel serverSocket = SocketChannel.open();
+                serverSocket.connect(new InetSocketAddress(serverAddress, port));
+
+                //send start and end positions to server
                 DataOutputStream out = new DataOutputStream(serverSocket.socket().getOutputStream());
+                out.writeUTF("GET");
                 out.writeLong(start);
                 out.writeLong(end);
                 out.flush();
-                
-                System.out.println("Client Thread : Downloading file range " + start + " to " + end);
-                fileChannel.transferFrom(serverSocket, start, end - start + 1);
-                System.out.println("Client Thread : Download complete! Range: " + start + " - " + end);
+                System.out.println("Client Thread : Requested bytes " + start + " to " + end);
 
+                RandomAccessFile raf = new RandomAccessFile(fileToSave, "rw");
+                FileChannel fc = raf.getChannel();
+                fc.position(start);
+
+                long total = 0;
+                long size = end - start + 1;
+                while (total < size) {
+                    long transferred = fc.transferFrom(serverSocket, start + total, size - total);
+                    total += transferred;
+                }
+                System.out.println("Client Thread : Completed downloading bytes " + start + " to " + end);
             } catch (Exception e) {
-                System.out.println("Error : " + e.getStackTrace());
+                e.printStackTrace();
             }
         }
     }
