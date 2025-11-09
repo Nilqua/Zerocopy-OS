@@ -12,6 +12,7 @@ public class ServerThread {
     public static void main(String[] args) {
         int port = 9999;
         String fileToSend = "..\\TestSite\\From\\TestFileSent";
+        
         try {
             //open server socket channel
             ServerSocketChannel serverSocket = ServerSocketChannel.open();
@@ -70,7 +71,7 @@ public class ServerThread {
                 long size = end - start + 1;
                 System.out.println("Server Thread : Client requested " + start + " to " + end);
 
-                //zero copy transfer
+                //zero copy disk->network
                 System.out.println("Server Thread : Start sending from " + start + " to " + end);
                 long total = 0;
                 while (total < size) {

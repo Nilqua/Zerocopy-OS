@@ -35,19 +35,12 @@ public class Server {
             long startTime = System.currentTimeMillis();
             long total = 0;
             while (total < fileSize){
-                long bytesTransferred = fileChannel.transferTo(total, fileSize-total, clientSocket);
+                long bytesTransferred = fileChannel.transferTo(total, fileSize-total, clientSocket); //8MB
                 total += bytesTransferred;
                 System.out.print("\rServer : File transfer (Sent " + total + "/" + fileSize + " bytes)");
             }
             long endTime = System.currentTimeMillis();
             System.out.println("\nServer : File transfer time: " + (endTime - startTime) + " ms");
-
-            //Close everything
-            fileChannel.close();
-            fileInputStream.close();
-            clientSocket.close();
-            serverSocket.close();
-
             } catch (Exception e) {
                 System.out.println();
                 System.out.println("Error : " + e);

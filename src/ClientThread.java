@@ -14,7 +14,7 @@ public class ClientThread {
         int port = 9999;
         String fileToSave = "..\\TestSite\\To\\TestFileDownloaded";
         int threadCount = 8;
-
+        
         try {
             //connect to server
             SocketChannel serverSocket = SocketChannel.open();
@@ -35,8 +35,15 @@ public class ClientThread {
             long startTime = System.currentTimeMillis();
             for (int i=0; i<threadCount; i++) {
                 long start = i * partSize;
-                long end = partSize + start - 1;
+                long end; 
+                //last thread takes the remainder
+                if (i == threadCount - 1) {
+                    end = fileSize - 1;
+                } else {
+                    end = partSize + start - 1;
+                }
 
+                //start file receiver
                 FileReceiver receiver = new FileReceiver(serverAddress, port, fileToSave, start, end);
                 threads[i] = new Thread(receiver);
                 threads[i].start();
@@ -83,10 +90,12 @@ public class ClientThread {
                 out.flush();
                 System.out.println("Client Thread : Requested bytes " + start + " to " + end);
 
+                //open random access file to write
                 RandomAccessFile raf = new RandomAccessFile(fileToSave, "rw");
                 FileChannel fc = raf.getChannel();
                 fc.position(start);
 
+                //zero copy network->disk
                 long total = 0;
                 long size = end - start + 1;
                 while (total < size) {
